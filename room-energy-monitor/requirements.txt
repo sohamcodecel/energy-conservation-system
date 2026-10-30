@@ -1,0 +1,13 @@
+# Backend
+fastapi
+uvicorn[standard]
+python-dotenv
+supabase
+pydantic
+
+# Scripts that talk to the backend
+requests
+
+# Camera detection (only needed for camera_detector.py)
+opencv-python
+ultralytics

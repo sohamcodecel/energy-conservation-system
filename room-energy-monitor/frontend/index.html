@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Room Energy Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #10151A;
+    --panel: #161D24;
+    --panel-line: #232D36;
+    --text: #ECE7DD;
+    --muted: #7E8A97;
+    --amber: #E7A93D;
+    --teal: #49C9AE;
+    --red: #E2613F;
+    font-family: 'IBM Plex Sans', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100%;
+  }
+  body {
+    padding: env(safe-area-inset-top, 0px) 24px env(safe-area-inset-bottom, 24px) 24px;
+    max-width: 880px;
+    margin: 0 auto;
+  }
+  header {
+    padding: 40px 0 28px 0;
+    border-bottom: 1px solid var(--panel-line);
+    margin-bottom: 28px;
+  }
+  h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 28px;
+    margin: 0 0 6px 0;
+    letter-spacing: -0.01em;
+  }
+  .subtitle {
+    color: var(--muted);
+    font-size: 15px;
+    max-width: 60ch;
+  }
+
+  .stat-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 560px) {
+    .stat-row { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-left: 3px solid var(--panel-line);
+    border-radius: 4px;
+    padding: 20px 22px;
+    transition: border-left-color 0.3s ease;
+  }
+  .panel.state-ok { border-left-color: var(--teal); }
+  .panel.state-warn { border-left-color: var(--amber); }
+
+  .panel-label {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .panel-value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 34px;
+    font-weight: 600;
+    line-height: 1;
+  }
+  .panel-sub {
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .waste-banner {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    background: rgba(226, 97, 63, 0.12);
+    border: 1px solid rgba(226, 97, 63, 0.35);
+    color: var(--red);
+    border-radius: 4px;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    font-size: 14px;
+  }
+  .waste-banner.visible { display: flex; }
+  .waste-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--red);
+    animation: pulse 1.4s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+
+  .lower-row {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 640px) {
+    .lower-row { grid-template-columns: 1fr; }
+  }
+
+  .summary .totals {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+  .total-item .num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 22px;
+    font-weight: 600;
+  }
+  .total-item .lbl {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  button#toggleBtn {
+    width: 100%;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 500;
+    font-size: 14px;
+    padding: 12px 16px;
+    border-radius: 4px;
+    border: 1px solid var(--panel-line);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  button#toggleBtn:hover { border-color: var(--muted); }
+  button#toggleBtn.cut {
+    background: var(--amber);
+    border-color: var(--amber);
+    color: #1A1305;
+  }
+
+  .log-title {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0 0 10px 2px;
+  }
+  .log-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 340px;
+    overflow-y: auto;
+  }
+  .log-item {
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-left: 3px solid var(--red);
+    border-radius: 4px;
+    padding: 12px 14px;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .log-item .when { color: var(--muted); }
+  .log-item .cost {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    color: var(--amber);
+    white-space: nowrap;
+  }
+  .empty-log {
+    color: var(--muted);
+    font-size: 13px;
+    padding: 12px 2px;
+  }
+
+  footer {
+    margin-top: 28px;
+    padding-top: 18px;
+    border-top: 1px solid var(--panel-line);
+    color: var(--muted);
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Room Energy Monitor</h1>
+  <div class="subtitle">Watching for power draw with nobody around, and adding it up.</div>
+</header>
+
+<div class="waste-banner" id="wasteBanner">
+  <span class="waste-dot"></span>
+  <span id="wasteBannerText">Electricity is on with no one in the room.</span>
+</div>
+
+<div class="stat-row">
+  <div class="panel" id="occPanel">
+    <div class="panel-label">Occupancy</div>
+    <div class="panel-value" id="occValue">—</div>
+    <div class="panel-sub" id="occSub">Waiting for camera data</div>
+  </div>
+  <div class="panel" id="powerPanel">
+    <div class="panel-label">Power draw</div>
+    <div class="panel-value" id="powerValue">— W</div>
+    <div class="panel-sub" id="powerSub">Waiting for sensor data</div>
+  </div>
+</div>
+
+<div class="lower-row">
+  <div class="summary">
+    <div class="totals">
+      <div class="total-item">
+        <div class="num" id="totalKwh">0.000 kWh</div>
+        <div class="lbl">Energy wasted so far</div>
+      </div>
+      <div class="total-item">
+        <div class="num" id="totalCost">₹0.00</div>
+        <div class="lbl">Estimated cost wasted</div>
+      </div>
+      <div class="total-item">
+        <div class="num" id="eventCount">0</div>
+        <div class="lbl">Waste events logged</div>
+      </div>
+    </div>
+    <button id="toggleBtn">Cut power (simulate)</button>
+  </div>
+
+  <div class="log">
+    <div class="log-title">Recent waste events</div>
+    <div class="log-list" id="logList">
+      <div class="empty-log">No waste events yet.</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  Polling <span id="apiUrlLabel"></span> every 3s. Camera and power simulator must be running separately.
+</footer>
+
+<script>
+  // Change this if your backend runs somewhere other than localhost:8000
+  const API = "http://localhost:8000";
+  document.getElementById("apiUrlLabel").textContent = API;
+
+  let powerCut = false;
+
+  function fmtTime(iso) {
+    const d = new Date(iso);
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function render(status) {
+    // Occupancy panel
+    const occValue = document.getElementById("occValue");
+    const occSub = document.getElementById("occSub");
+    const occPanel = document.getElementById("occPanel");
+    if (status.person_present === null) {
+      occValue.textContent = "—";
+      occSub.textContent = "Waiting for camera data";
+    } else if (status.person_present) {
+      occValue.textContent = "Present";
+      occSub.textContent = "Someone is in the room";
+      occPanel.className = "panel state-ok";
+    } else {
+      occValue.textContent = "Empty";
+      occSub.textContent = "No one detected";
+      occPanel.className = "panel";
+    }
+
+    // Power panel
+    const powerValue = document.getElementById("powerValue");
+    const powerSub = document.getElementById("powerSub");
+    const powerPanel = document.getElementById("powerPanel");
+    if (status.watts === null) {
+      powerValue.textContent = "— W";
+      powerSub.textContent = "Waiting for sensor data";
+    } else {
+      powerValue.textContent = `${status.watts.toFixed(1)} W`;
+      powerSub.textContent = status.power_cut ? "Power manually cut" : "Live reading";
+      powerPanel.className = status.waste_active ? "panel state-warn" : "panel state-ok";
+    }
+
+    // Waste banner
+    const banner = document.getElementById("wasteBanner");
+    const bannerText = document.getElementById("wasteBannerText");
+    if (status.waste_active) {
+      banner.classList.add("visible");
+      const mins = Math.floor(status.current_waste_seconds / 60);
+      const secs = status.current_waste_seconds % 60;
+      bannerText.textContent = `Electricity is on with no one in the room — ${mins}m ${secs}s so far.`;
+    } else {
+      banner.classList.remove("visible");
+    }
+
+    // Totals
+    document.getElementById("totalKwh").textContent = `${status.total_kwh_wasted.toFixed(3)} kWh`;
+    document.getElementById("totalCost").textContent = `₹${status.total_cost_wasted.toFixed(2)}`;
+    document.getElementById("eventCount").textContent = status.event_count;
+
+    // Toggle button
+    powerCut = status.power_cut;
+    const btn = document.getElementById("toggleBtn");
+    btn.textContent = powerCut ? "Restore power (simulate)" : "Cut power (simulate)";
+    btn.className = powerCut ? "cut" : "";
+
+    // Log
+    const logList = document.getElementById("logList");
+    if (!status.recent_events || status.recent_events.length === 0) {
+      logList.innerHTML = '<div class="empty-log">No waste events yet.</div>';
+    } else {
+      logList.innerHTML = status.recent_events.map(ev => `
+        <div class="log-item">
+          <span class="when">${fmtTime(ev.started_at)} – ${fmtTime(ev.ended_at)} · ${ev.watts.toFixed(0)}W</span>
+          <span class="cost">₹${ev.cost.toFixed(2)}</span>
+        </div>
+      `).join("");
+    }
+  }
+
+  async function refresh() {
+    try {
+      const res = await fetch(`${API}/status`);
+      const data = await res.json();
+      render(data);
+    } catch (err) {
+      console.error("Failed to fetch status:", err);
+    }
+  }
+
+  document.getElementById("toggleBtn").addEventListener("click", async () => {
+    const action = powerCut ? "restore" : "cut";
+    try {
+      await fetch(`${API}/toggle-power`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      refresh();
+    } catch (err) {
+      console.error("Failed to toggle power:", err);
+    }
+  });
+
+  refresh();
+  setInterval(refresh, 3000);
+</script>
+
+</body>
+</html>
